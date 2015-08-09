@@ -1,6 +1,9 @@
 import cv2
 import numpy
 
+# TODO: 
+#   improve blur -> use median instead of kernal
+
 from time import strftime
 
 # blur/no blur doesn't result in much difference in terms of image result
