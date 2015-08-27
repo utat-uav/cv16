@@ -7,11 +7,12 @@ import numpy
 from time import strftime
 
 # blur/no blur doesn't result in much difference in terms of image result
+# correction: blur is bad. Avoid blur like the plague for MSER
 
 _MYPARAMS = {
     'IMAGE' : "im0216.jpg",
-    'HAS_BLUR' : 0,
-    'BKS' : 10 # Blur Kernal size
+    'HAS_BLUR' : 1,
+    'BKS' : 20 # Blur Kernal size
 }
 
 
@@ -32,9 +33,13 @@ def main():
         hsv_chans =  [cv2.blur(hsvim, (_MYPARAMS['BKS'], _MYPARAMS['BKS'])) for hsvim in hsv_chans]
     
     # may use other feature detector for testing
-    FD_TYPE = "MSER"
+    # FD_TYPE = "MSER"
+    # PRINT_LOG_OUT.append("FD Type: " + FD_TYPE)
+    # my_fd = cv2.MSER_create() 
+
+    FD_TYPE = "SimpleBlob"
     PRINT_LOG_OUT.append("FD Type: " + FD_TYPE)
-    my_fd = cv2.MSER_create() 
+    my_fd = cv2.SimpleBlobDetector_create() 
     
     kpts = [] # (k)ey(p)oin(t) out
     dkpsout = [] # (d)isplay (k)ey(p)oint (out)put
