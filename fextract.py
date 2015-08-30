@@ -2,7 +2,7 @@ import cv2
 import numpy
 
 # TODO: 
-#   improve blur -> use median instead of kernal
+#   Add false positive filter
 
 from time import strftime
 
@@ -19,6 +19,20 @@ _MYPARAMS = {
 
 def clamp(num, mymin, mymax):
     return min(mymax, max(num, mymin))
+
+
+def not_too_close(new_pt, ptlist):
+    # minimum taxicab distance must be greater than size of roi
+    # detect if two points are too close
+    sroi = _MYPARAMS['SIZE_OF_ROI']
+    for pt in ptlist:
+        if (abs(new_pt[0] - pt[0]) < sroi or abs(new_pt[1] - pt[1]) < sroi):
+            return 0
+        else:
+            return 1
+    # if pointlist is empty
+    return 1
+
 
 def main():
     PRINT_LOG_OUT = []
@@ -62,20 +76,24 @@ def main():
             # print out num of keypoints and other info 
             PRINT_LOG_OUT.append('Channel: ' + str(i) + ' #kpts: ' + str(len(local_kpt)))
 
+
     # Crop out ROIs for active_channel
+    ptlist = []
     for i, kpt in enumerate(kpts[_MYPARAMS['ACTIVE_CHANNEL']]):
         # MSER detects features as a fraction of a coordinate, apparently
         # Also, cv2 keypoints are a pain to work with, so I'm turning it into a regular old tuple
         # Should be (row, column) as usual
         mypoint = (int(kpt.pt[1]), int(kpt.pt[0]))
 
-        hs = _MYPARAMS['SIZE_OF_ROI'] / 2 # (h)alf (s)ize
-        # Schenanigans for cropping and making sure that crop doesn't exceed bounds
-        row_crop = (clamp(mypoint[0]-hs, 0, _IMBND[0]), clamp(mypoint[0]+hs, 0, _IMBND[0]))
-        col_crop = (clamp(mypoint[1]-hs, 0, _IMBND[1]), clamp(mypoint[1]+hs, 0, _IMBND[1]))
-        new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
+        if not_too_close(mypoint, ptlist) == 1:
+            hs = _MYPARAMS['SIZE_OF_ROI'] / 2 # (h)alf (s)ize
+            # Schenanigans for cropping and making sure that crop doesn't exceed bounds
+            row_crop = (clamp(mypoint[0]-hs, 0, _IMBND[0]), clamp(mypoint[0]+hs, 0, _IMBND[0]))
+            col_crop = (clamp(mypoint[1]-hs, 0, _IMBND[1]), clamp(mypoint[1]+hs, 0, _IMBND[1]))
+            new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
 
-        cv2.imwrite('chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg', new_crop)
+            cv2.imwrite('chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg', new_crop)
+            ptlist.append(mypoint) 
 
     # print result info to log file
     with open('results.log', 'a') as f:
