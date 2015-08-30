@@ -28,8 +28,6 @@ def not_too_close(new_pt, ptlist):
     for pt in ptlist:
         if (abs(new_pt[0] - pt[0]) < sroi or abs(new_pt[1] - pt[1]) < sroi):
             return 0
-        else:
-            return 1
     # if pointlist is empty
     return 1
 
