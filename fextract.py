@@ -3,6 +3,7 @@ import numpy
 import os
 import shutil
 import copy
+import random
 
 # TODO: 
 #   Add false positive filter
@@ -14,69 +15,109 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : 2,
-    'IMAGE' : "im0211.jpg",
+    'IMAGE' : "im0296.jpg",
     'HAS_BLUR' : 1,
-    'BKS' : 7, # Blur Kernal size
+    'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 120, # Size of target to crop
     'MIN_POINTS_IN_CLUSTER' : 1
 }
 
+'''Used to make sure that a point is within a certain ROI'''
 def clamp(num, mymin, mymax):
     return min(mymax, max(num, mymin))
 
+'''Colorful drawings'''
+def drawClusters(imgClusteredRegions, clusters, clusterLocations):
+    for i, cluster in enumerate(clusters):
+        #Get point
+        clusterLocation = clusterLocations[i]
+        hs = _MYPARAMS['SIZE_OF_ROI']/2
+        # Draw rectangle
+        cv2.rectangle(imgClusteredRegions, (clusterLocation[1]-hs, clusterLocation[0]-hs), (clusterLocation[1]+hs,clusterLocation[0]+hs), (255, 255, 255), 1)
+        # Draw number of dots
+        cv2.putText(imgClusteredRegions, str(len(cluster)) + ' points', (clusterLocation[1]-hs, clusterLocation[0]-hs), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255))
+        # Draw dots
+        randClusterColor = (random.randint(0, 255), random.randint(0, 255), random.randint(0, 255))
+        for clusterPoint in cluster:
+            cv2.circle(imgClusteredRegions, (int(clusterPoint[1]), int(clusterPoint[0])), 4, randClusterColor, 2)
+    return imgClusteredRegions
 
-def not_too_close(new_pt, ptlist):
-    # minimum taxicab distance must be greater than size of roi
-    # detect if two points are too close
-    sroi = _MYPARAMS['SIZE_OF_ROI']
-    for pt in ptlist:
-        if (abs(new_pt[0] - pt[0]) < sroi or abs(new_pt[1] - pt[1]) < sroi):
-            return 0
-    # if pointlist is empty
-    return 1
-
+'''Pythag it'''
 def distanceBetween(one, two):
     return ((one[0] - two[0]) ** 2 + (one[1] - two[1]) ** 2) ** 0.5
 
-def cluster(kpts):
-    clusters = []
-    clusterIndex = 0
-    checkedPoints = [-1] * len(kpts) # Stores the index of the cluster that it belongs to
+'''RECURSIVE METHOD'''
+# Global variables
+checkedPoints = []
+maxDist = _MYPARAMS['SIZE_OF_ROI']/2
+maxClusterIndex = -1
 
+def copyKpts(kpts):
+    global checkedPoints
     for i, kpt in enumerate(kpts):
-        if checkedPoints[i] == -1: # If the point hasn't been checked yet
-            point = (int(kpt.pt[1]), int(kpt.pt[0]))
+        point = (int(kpt.pt[1]), int(kpt.pt[0]))
+        checkedPoints.append([point[0], point[1], -1]) # X, Y, ClusterIndex
 
-            checkedPoints[i] = clusterIndex
-            # Create a new cluster for it
-            clusters.append([point])
+def getClosestNeighbours(j, clustered):
+    global checkedPoints
+    minDist = -1
+    closestNeighbour = -1
+    closestNeighbours = []
+    for i, pointCheck in enumerate(checkedPoints):
+        if i != j:
+            distance = distanceBetween((checkedPoints[j][0], checkedPoints[j][1]), (pointCheck[0], pointCheck[1]))
+            mode = True
+            if clustered:
+                mode = pointCheck[2] > -1
+            else:
+                mode = pointCheck[2] == -1
+            if mode and distance <= maxDist: # If not itself and not clustered and within a fair distance
+                closestNeighbours.append(i) # stores pointIndices
+                if minDist == -1:
+                    minDist = distance
+                if distance <= minDist:
+                    minDist = distance
+                    closestNeighbour = i
+    return closestNeighbour, closestNeighbours
 
-            # Check to see if this point belongs to any other clusters
-            pointSorted = False
-            for j, pointClusterIndex in enumerate(checkedPoints):
-                if pointClusterIndex > -1 and j != i: # If this point has been put into a cluster and isn't itself
-                    pointCheck = (int(kpts[j].pt[1]), int(kpts[j].pt[0]))
-                    distance = distanceBetween(pointCheck, point)
-                    if distance <= _MYPARAMS['SIZE_OF_ROI']:
-                        # Add to this pointClusterIndex
-                        clusters[pointClusterIndex].append(pointCheck)
-                        # Remove the current cluster
-                        clusters.pop()
-                        clusterIndex = clusterIndex - 1
-                        pointSorted = True
-                        break
+def checkPoint(i):
+    global checkedPoints
+    global maxClusterIndex
 
-            # If this point is destined to be a whole new group
-            if not pointSorted:
-                for j, kptCheck in enumerate(kpts):
-                    pointCheck = (int(kptCheck.pt[1]), int(kptCheck.pt[0]))
-                    distance = distanceBetween(pointCheck, point)
-                    if checkedPoints[j] == -1 and distance <= _MYPARAMS['SIZE_OF_ROI']: # If not checked and within suitable distance
-                        checkedPoints[j] = clusterIndex
-                        clusters[clusterIndex].append(pointCheck)
+    # Set the cluster index
+    checkedPoints[i][2] = maxClusterIndex
 
-            clusterIndex = clusterIndex + 1  
-    
+    # Get neighbours
+    closestUnclusteredNeighbour, closestUnclusteredNeighbours = getClosestNeighbours(i, False)
+
+    for unclusteredNeighbour in closestUnclusteredNeighbours:
+        # Recursive call for neighbours
+        neighbourClustered = checkPoint(unclusteredNeighbour)
+
+def getClusters(kpts):
+    global checkedPoints
+    global maxClusterIndex
+    copyKpts(kpts)
+    for i, point in enumerate(checkedPoints):
+        if point[2] == -1:
+            maxClusterIndex += 1
+            checkPoint(i)
+
+    clusters = []
+    for i in range(maxClusterIndex):
+        clusters.append([])
+        for j, point in enumerate(checkedPoints):
+            if point[2] == i:
+                clusters[i].append((point[0], point[1]))
+
+    # Remove high STD values
+    clusterSTDs = stdClusters(clusters)
+    stdFilteredClusters = []
+    for i, cluster in enumerate(clusters):
+        if clusterSTDs[i][0] < _MYPARAMS['SIZE_OF_ROI']/2 and clusterSTDs[i][1] < _MYPARAMS['SIZE_OF_ROI']/2: # plus stdLen?
+            stdFilteredClusters.append(cluster)
+    clusters = stdFilteredClusters
+
     filteredClusters = []
     # find average amount of clusters
     lengths = []
@@ -85,14 +126,17 @@ def cluster(kpts):
     avgLen = numpy.mean(lengths)
     stdLen = numpy.std(lengths)
 
-    for cluster in clusters:
+    for i, cluster in enumerate(clusters):
         if len(cluster) > _MYPARAMS['MIN_POINTS_IN_CLUSTER'] and len(cluster) > (avgLen): # plus stdLen?
             filteredClusters.append(cluster)
 
     if len(filteredClusters) >= 1:
-        return filteredClusters # Indicates high confidence in results
-    return clusters # Indicates low confidence in results
+        return len(clusters) - len(filteredClusters), filteredClusters # Indicates high confidence in results
+    return 0, clusters # Indicates low confidence in results
 
+'''END RECURSIVE METHOD'''
+
+'''Average the location of all clusters'''
 def averageClusters(clusters):
     averagedClusters = []
     for i, cluster in enumerate(clusters):
@@ -110,11 +154,28 @@ def averageClusters(clusters):
 
     return averagedClusters
 
+'''Get standard deviation of clusters'''
+def stdClusters(clusters):
+    clusterStds = []
+    for i, cluster in enumerate(clusters):
+        xVals = []
+        yVals = []
+        for point in cluster:
+            xVals.append(point[0])
+            yVals.append(point[1])
+        xSTD = numpy.std(xVals)
+        ySTD = numpy.std(yVals)
+        clusterStds.append([xSTD, ySTD])
+
+    return clusterStds
+
 def main():
     PRINT_LOG_OUT = []
-    PRINT_LOG_OUT.append("\n" + strftime("%Y-%m-%d %H:%M:%S"))
+    PRINT_LOG_OUT.append("[Date]")
+    PRINT_LOG_OUT.append("Date = " + strftime("%Y-%m-%d %H:%M:%S"))
+    PRINT_LOG_OUT.append("\n[Analysis Parameters]")
     # print parameters
-    PRINT_LOG_OUT += [str(k) + ": "  + str(_MYPARAMS[k]) for k in _MYPARAMS.keys()]
+    PRINT_LOG_OUT += [str(k) + " = "  + str(_MYPARAMS[k]) for k in _MYPARAMS.keys()]
     
     # output folder
     fileList = os.listdir("Output")
@@ -136,20 +197,21 @@ def main():
     
     # may use other feature detector for testing
     FD_TYPE = "MSER"
-    PRINT_LOG_OUT.append("FD Type: " + FD_TYPE)
+    PRINT_LOG_OUT.append("FD Type = " + FD_TYPE)
     my_fd = cv2.MSER_create() 
 
     # FD_TYPE = "SimpleBlob"
     # PRINT_LOG_OUT.append("FD Type: " + FD_TYPE)
     # my_fd = cv2.SimpleBlobDetector_create() 
     
+    imgClusteredRegions = copy.copy(imgin)
+
+    PRINT_LOG_OUT.append("\n[Channel Keypoints]")
+
     kpts = [] # (k)ey(p)oin(t) out
     dkpsout = [] # (d)isplay (k)ey(p)oint (out)put
     for i, im in enumerate(hsv_chans):
         local_kpt = my_fd.detect(im) # local keypoints
-
-        imgClusteredRegions = copy.copy(imgin)
-        cv2.drawKeypoints(imgClusteredRegions, local_kpt, imgClusteredRegions)
 
         kpts.append(local_kpt)
         if (local_kpt):
@@ -159,44 +221,46 @@ def main():
             cv2.imwrite(os.path.join("Output", 'dkpsout' + str(i) + '.jpg'), local_dpksout)
 
             # print out num of keypoints and other info 
-            PRINT_LOG_OUT.append('Channel: ' + str(i) + ' #kpts: ' + str(len(local_kpt)))
+            PRINT_LOG_OUT.append('Channel ' + str(i) + ' = ' + str(len(local_kpt)))
 
     # Crop out ROIs for active_channel
     # TODO: Add to log file
     ptlist = []
-    clusters = cluster(kpts[_MYPARAMS['ACTIVE_CHANNEL']])
-    clusters = averageClusters(clusters)
+    numRejected, clusters = getClusters(kpts[_MYPARAMS['ACTIVE_CHANNEL']])
+    averagedClusters = averageClusters(clusters)
+    clusterSTDs = stdClusters(clusters)
     hs = _MYPARAMS['SIZE_OF_ROI'] / 2
-    for i, mypoint in enumerate(clusters):
+    for i, mypoint in enumerate(averagedClusters):
         row_crop = (clamp(mypoint[0]-hs, 0, _IMBND[0]), clamp(mypoint[0]+hs, 0, _IMBND[0]))
         col_crop = (clamp(mypoint[1]-hs, 0, _IMBND[1]), clamp(mypoint[1]+hs, 0, _IMBND[1]))
         new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
         cv2.imwrite(os.path.join("Output", 'chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg'), new_crop)
-        # draw rectangle
-        cv2.rectangle(imgClusteredRegions, (mypoint[1]-hs, mypoint[0]-hs), (mypoint[1]+hs,mypoint[0]+hs), (255, 255, 255), 1)
 
+    confidence = ""
+    if numRejected == 0:
+        confidence = "Low"
+    else:
+        confidence = "High"
+
+    PRINT_LOG_OUT.append("\n[Clustering Info]")
+    PRINT_LOG_OUT.append("Rejected Clusters = " + str(numRejected))
+    PRINT_LOG_OUT.append("Confidence = " + confidence)
+
+    # Write log for the clusters
+    for i, cluster in enumerate(clusters):
+        PRINT_LOG_OUT.append("\n[Cluster " + str(i+1) + "]")
+        PRINT_LOG_OUT.append("NumPoints = " + str(len(cluster)))
+        PRINT_LOG_OUT.append("X = " + str(averagedClusters[i][1]))
+        PRINT_LOG_OUT.append("Y = " + str(averagedClusters[i][0]))
+        PRINT_LOG_OUT.append("X STD = " + str(clusterSTDs[i][1]))
+        PRINT_LOG_OUT.append("Y STD = " + str(clusterSTDs[i][0]))
+
+    # Output cluster locations
+    imgClusteredRegions = drawClusters(imgClusteredRegions, clusters, averagedClusters)
     cv2.imwrite(os.path.join("Output", 'croppedRegions.jpg'), imgClusteredRegions)
 
-    ''' OLD METHOD
-    for i, kpt in enumerate(kpts[_MYPARAMS['ACTIVE_CHANNEL']]):
-        # MSER detects features as a fraction of a coordinate, apparently
-        # Also, cv2 keypoints are a pain to work with, so I'm turning it into a regular old tuple
-        # Should be (row, column) as usual
-        mypoint = (int(kpt.pt[1]), int(kpt.pt[0]))
-
-        if not_too_close(mypoint, ptlist) == 1:
-            hs = _MYPARAMS['SIZE_OF_ROI'] / 2 # (h)alf (s)ize
-            # Schenanigans for cropping and making sure that crop doesn't exceed bounds
-            row_crop = (clamp(mypoint[0]-hs, 0, _IMBND[0]), clamp(mypoint[0]+hs, 0, _IMBND[0]))
-            col_crop = (clamp(mypoint[1]-hs, 0, _IMBND[1]), clamp(mypoint[1]+hs, 0, _IMBND[1]))
-            new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
-
-            cv2.imwrite(os.path.join("Output", 'chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg'), new_crop)
-            ptlist.append(mypoint) 
-    END OF OLD METHOD ''' 
-
     # print result info to log file
-    with open('results.log', 'a') as f:
+    with open(os.path.join("Output", 'results.ini'), 'a') as f:
         for line in PRINT_LOG_OUT:
             f.write(line + '\n')
 
