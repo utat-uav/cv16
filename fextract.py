@@ -14,8 +14,8 @@ from time import strftime
 # correction: blur is bad. Avoid blur like the plague for MSER
 
 _MYPARAMS = {
-    'ACTIVE_CHANNEL' : 2,
-    'IMAGE' : "im0296.jpg",
+    'ACTIVE_CHANNEL' : -1,
+    'IMAGE' : "im0211.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 120, # Size of target to crop
@@ -213,7 +213,11 @@ def main():
     for i, im in enumerate(hsv_chans):
         local_kpt = my_fd.detect(im) # local keypoints
 
-        kpts.append(local_kpt)
+        if _MYPARAMS['ACTIVE_CHANNEL'] == -1:
+            for point in local_kpt:
+                kpts.append(point)
+        else:
+            kpts.append(local_kpt)
         if (local_kpt):
             # don't know how the third param works yet  -->
             local_dpksout = cv2.drawKeypoints(im, local_kpt, im) 
@@ -225,8 +229,10 @@ def main():
 
     # Crop out ROIs for active_channel
     # TODO: Add to log file
-    ptlist = []
-    numRejected, clusters = getClusters(kpts[_MYPARAMS['ACTIVE_CHANNEL']])
+    if _MYPARAMS['ACTIVE_CHANNEL'] == -1:
+        numRejected, clusters = getClusters(kpts)
+    else:
+        numRejected, clusters = getClusters(kpts[_MYPARAMS['ACTIVE_CHANNEL']])
     averagedClusters = averageClusters(clusters)
     clusterSTDs = stdClusters(clusters)
     hs = _MYPARAMS['SIZE_OF_ROI'] / 2
@@ -236,12 +242,12 @@ def main():
         new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
         cv2.imwrite(os.path.join("Output", 'chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg'), new_crop)
 
+    # Log clustering info
     confidence = ""
     if numRejected == 0:
         confidence = "Low"
     else:
         confidence = "High"
-
     PRINT_LOG_OUT.append("\n[Clustering Info]")
     PRINT_LOG_OUT.append("Rejected Clusters = " + str(numRejected))
     PRINT_LOG_OUT.append("Confidence = " + confidence)
