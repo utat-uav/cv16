@@ -16,7 +16,7 @@ from time import strftime
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
     # 'IMAGE' : "IMG_0520.jpg",
-    'IMAGE' : "im0216.jpg",
+    'IMAGE' : "img0216.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -70,14 +70,10 @@ def hulls2Points(hulls):
         x = []
         y = []
         for point in hull:
-            if point[0][0] > maxX:
-                maxX = point[0][0]
-            if point[0][0] < minX:
-                minX = point[0][0]
-            if point[0][1] > maxY:
-                maxY = point[0][1]
-            if point[0][1] < minY:
-                minY = point[0][1]
+            maxX = max(point[0][0], maxX)
+            minX = min(point[0][0], minX)
+            maxY = max(point[0][1], maxY)
+            minY = min(point[0][1], minY)
             x.append(point[0][0])
             y.append(point[0][1])
         points.append([numpy.mean(x), numpy.mean(y)])
