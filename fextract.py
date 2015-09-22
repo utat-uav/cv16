@@ -4,6 +4,8 @@ import os
 import shutil
 import copy
 import random
+from dbscan import dbscan
+
 from time import strftime
 
 # TODO: 
@@ -13,7 +15,8 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "IMG_0520.jpg",
+    # 'IMAGE' : "IMG_0520.jpg",
+    'IMAGE' : "im0216.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -22,6 +25,7 @@ _MYPARAMS = {
     'MAX_AREA' : 38000,
     'MIN_AREA' : 3500
 }
+
 
 '''Used to make sure that a point is within a certain ROI'''
 def clamp(num, mymin, mymax):
@@ -114,115 +118,6 @@ def largestSize(clusters, sizes):
     #    largestSizes.append([maxX, maxY])
     return largestSizes
 
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-'''DBSCAN'''
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-# Global variables
-checkedPoints = []
-maxDist = _MYPARAMS['SIZE_OF_ROI']/2
-maxClusterIndex = -1
-
-'''Converts raw keypoints from openCV to a regular array'''
-def copyKpts(kpts):
-    global checkedPoints
-    for i, kpt in enumerate(kpts):
-        point = (int(kpt.pt[1]), int(kpt.pt[0]))
-        checkedPoints.append([point[0], point[1], -1]) # X, Y, ClusterIndex
-
-def initPoints(kpts):
-    global checkedPoints
-    for i, kpt in enumerate(kpts):
-        checkedPoints.append([kpt[1], kpt[0], -1]) # X, Y, ClusterIndex
-
-'''Region query'''
-def getClosestNeighbours(j, clustered):
-    global checkedPoints
-    minDist = -1
-    closestNeighbour = -1
-    closestNeighbours = []
-    for i, pointCheck in enumerate(checkedPoints):
-        if i != j:
-            distance = distanceBetween((checkedPoints[j][0], checkedPoints[j][1]), (pointCheck[0], pointCheck[1]))
-            mode = True
-            if clustered:
-                mode = pointCheck[2] > -1
-            else:
-                mode = pointCheck[2] == -1
-            if mode and distance <= maxDist: # If not itself and not clustered and within a fair distance
-                closestNeighbours.append(i) # stores pointIndices
-                if minDist == -1:
-                    minDist = distance
-                if distance <= minDist:
-                    minDist = distance
-                    closestNeighbour = i
-    return closestNeighbour, closestNeighbours
-
-'''Expanding for DBSCAN algorithm'''
-def checkPoint(i):
-    global checkedPoints
-    global maxClusterIndex
-
-    # Set the cluster index
-    checkedPoints[i][2] = maxClusterIndex
-
-    # Get neighbours / do region query for unclustered neighbours
-    closestUnclusteredNeighbour, closestUnclusteredNeighbours = getClosestNeighbours(i, False)
-
-    k = 0
-    while k < len(closestUnclusteredNeighbours):
-        unclusteredNeighbour = closestUnclusteredNeighbours[k]
-        k += 1
-
-        # Recursive call for neighbours
-        #neighbourClustered = checkPoint(unclusteredNeighbour)
-
-        # Non-recursive method
-        checkedPoints[unclusteredNeighbour][2] = maxClusterIndex
-        newClosestUnclusteredNeighbour, newClosestUnclusteredNeighbours = getClosestNeighbours(unclusteredNeighbour, False)
-        # Combine without repeats
-        closestUnclusteredNeighbours = closestUnclusteredNeighbours + list(set(newClosestUnclusteredNeighbours) - set(closestUnclusteredNeighbours))
-
-'''Runs DBSCAN and false positive filter'''
-def getClusters(kpts, kptsSizes):
-    global checkedPoints
-    global maxClusterIndex
-    #copyKpts(kpts)
-    initPoints(kpts)
-    for i, point in enumerate(checkedPoints):
-        if point[2] == -1:
-            maxClusterIndex += 1
-            checkPoint(i)
-
-    clusters = []
-    clusterSizes = []
-    for i in range(maxClusterIndex + 1):
-        clusters.append([])
-        clusterSizes.append([])
-        for j, point in enumerate(checkedPoints):
-            if point[2] == i:
-                clusters[i].append((point[0], point[1]))
-                clusterSizes[i].append((kptsSizes[j][0], kptsSizes[j][1]))
-
-    filteredClusters = []
-    filteredClusterSizes = []
-    # find average amount of clusters
-    lengths = []
-    for cluster in clusters:
-        lengths.append(len(cluster))
-    avgLen = numpy.mean(lengths)
-    stdLen = numpy.std(lengths)
-
-    for i, cluster in enumerate(clusters):
-        #if len(cluster) >= _MYPARAMS['MIN_POINTS_IN_CLUSTER'] and len(cluster) >= (avgLen + stdLen): # plus stdLen?
-        #if len(cluster) <= avgLen + stdLen:
-        filteredClusters.append(cluster)
-        filteredClusterSizes.append(clusterSizes[i])
-
-    return filteredClusters, filteredClusterSizes # Indicates high confidence in results
-
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
-'''END OF DBSCAN'''
-''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
 
 '''Filter for trees by color'''
 def filterTrees(imgin, clusters, clusterSizes):
@@ -283,6 +178,10 @@ def stdClusters(clusters):
     return clusterStds
 
 def main():
+
+    # Initialize dbscan
+    myDbscan = dbscan(_MYPARAMS['SIZE_OF_ROI']/2);
+
     PRINT_LOG_OUT = []
     PRINT_LOG_OUT.append("[Date]")
     PRINT_LOG_OUT.append("Date Analyzed = " + strftime("%Y-%m-%d %H:%M:%S"))
@@ -297,6 +196,12 @@ def main():
     
     # import image from file
     imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
+
+    # Check if image imported correctly
+    if (imgin == None):
+        print "Image does not exist! Aborting...\n"
+        return;
+
     hsv_imgin = cv2.cvtColor(imgin, cv2.COLOR_BGR2HSV)
 
     # Detect image size [rows, columns]
@@ -352,7 +257,7 @@ def main():
             PRINT_LOG_OUT.append('Channel ' + str(i) + ' = ' + str(len(local_kpt)))
 
     # Crop out ROIs for active_channel
-    clusters, clusterSizes = getClusters(kpts, kptsSize)
+    clusters, clusterSizes = myDbscan.getClusters(kpts, kptsSize)
     averagedClusters = averageClusters(clusters)
     clusterSizes = largestSize(clusters, clusterSizes)
     # Tree filter
