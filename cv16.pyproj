@@ -26,6 +26,7 @@
     <Content Include="im0235.jpg" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="dbscan.py" />
     <Compile Include="fextract.py" />
   </ItemGroup>
   <ItemGroup>

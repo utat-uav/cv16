@@ -1,4 +1,4 @@
-import numpy
+﻿import numpy
 
 """DBSCAN implementation"""
 
@@ -20,6 +20,9 @@ class dbscan:
         for i, kpt in enumerate(kpts):
             self.checkedPoints.append([kpt[1], kpt[0], -1]) # X, Y, ClusterIndex
 
+    def distanceBetween(self, one, two):
+        return ((one[0] - two[0]) ** 2 + (one[1] - two[1]) ** 2) ** 0.5
+
     '''Region query'''
     def getClosestNeighbours(self, j, clustered):
         minDist = -1
@@ -27,7 +30,7 @@ class dbscan:
         closestNeighbours = []
         for i, pointCheck in enumerate(self.checkedPoints):
             if i != j:
-                distance = distanceBetween((self.checkedPoints[j][0], self.checkedPoints[j][1]), (pointCheck[0], pointCheck[1]))
+                distance = self.distanceBetween((self.checkedPoints[j][0], self.checkedPoints[j][1]), (pointCheck[0], pointCheck[1]))
                 mode = True
                 if clustered:
                     mode = pointCheck[2] > -1

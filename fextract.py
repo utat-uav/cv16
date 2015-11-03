@@ -15,15 +15,19 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    # 'IMAGE' : "IMG_0520.jpg",
-    'IMAGE' : "img0216.jpg",
+    'IMAGE' : "im0360.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
     'MIN_POINTS_IN_CLUSTER' : 5,
     'USE_TREE_FILTER' : 1, # Filters out crops that are "tree colored"
-    'MAX_AREA' : 38000,
-    'MIN_AREA' : 3500
+	# USC SETTINGS
+    #'MAX_AREA' : 38000,
+    #'MIN_AREA' : 3500,
+	# TARGET SETTINGS
+    'MAX_AREA' : 30000,
+    'MIN_AREA' : 2650,
+	'CROP_PADDING' : 6
 }
 
 
@@ -191,12 +195,13 @@ def main():
         os.remove("Output/"+fileName)
     
     # import image from file
+    print("Loading Image...")
     imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
 
     # Check if image imported correctly
-    if (imgin == None):
-        print "Image does not exist! Aborting...\n"
-        return;
+    #if (imgin == None):
+    #    print "Image does not exist! Aborting...\n"
+    #    return;
 
     hsv_imgin = cv2.cvtColor(imgin, cv2.COLOR_BGR2HSV)
 
@@ -212,6 +217,7 @@ def main():
     # may use other feature detector for testing
     FD_TYPE = "MSER"
     PRINT_LOG_OUT.append("FD Type = " + FD_TYPE)
+    print("Running MSER...")
     # delta, maxArea, minArea, maxVariation, minDiversity, maxEvolution, areaThreshold, minMargin, edgeBlurSize
     # Decreasing maxVariation increases how sharp edges need to be
     my_fd = cv2.MSER_create(5, _MYPARAMS['MIN_AREA'] / 2738 * _IMBND[0], _MYPARAMS['MAX_AREA'] / 2738 * _IMBND[0], 0.099, 0.65, 200, 1.01, 0.003, 5) # Default is 5, 60, 14400, 0.25, 0.2, 200, 1.01, 0.003, 5
@@ -257,14 +263,17 @@ def main():
     averagedClusters = averageClusters(clusters)
     clusterSizes = largestSize(clusters, clusterSizes)
     # Tree filter
+    print("Filtering trees...")
     if _MYPARAMS['USE_TREE_FILTER']:
         averagedClusters, clusterSizes = filterTrees(imgin, averagedClusters, clusterSizes)
 
     croppedImgNames = []
+    print("Cropping...")
     for i, mypoint in enumerate(averagedClusters):
         cropSize = clusterSizes[i][1]/2 if clusterSizes[i][1]/2 > clusterSizes[i][0]/2 else clusterSizes[i][0]/2
-        row_crop = (clamp(mypoint[0]-cropSize, 0, _IMBND[0]), clamp(mypoint[0]+cropSize, 0, _IMBND[0]))
-        col_crop = (clamp(mypoint[1]-cropSize, 0, _IMBND[1]), clamp(mypoint[1]+cropSize, 0, _IMBND[1]))
+        padding = _MYPARAMS['CROP_PADDING']
+        row_crop = (clamp(mypoint[0]-cropSize - padding, 0, _IMBND[0]), clamp(mypoint[0]+cropSize + padding, 0, _IMBND[0]))
+        col_crop = (clamp(mypoint[1]-cropSize - padding, 0, _IMBND[1]), clamp(mypoint[1]+cropSize + padding, 0, _IMBND[1]))
         new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
         croppedImgNames.append('chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg')
         cv2.imwrite(os.path.join("Output", croppedImgNames[i]), new_crop)
