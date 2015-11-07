@@ -15,18 +15,18 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "im0360.jpg",
+    'IMAGE' : "IMG_0496.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
     'MIN_POINTS_IN_CLUSTER' : 5,
     'USE_TREE_FILTER' : 1, # Filters out crops that are "tree colored"
 	# USC SETTINGS
-    #'MAX_AREA' : 38000,
-    #'MIN_AREA' : 3500,
+    'MAX_AREA' : 38000,
+    'MIN_AREA' : 3500,
 	# TARGET SETTINGS
-    'MAX_AREA' : 30000,
-    'MIN_AREA' : 2650,
+    #'MAX_AREA' : 30000,
+    #'MIN_AREA' : 2650,
 	'CROP_PADDING' : 6
 }
 
@@ -288,6 +288,9 @@ def main():
         PRINT_LOG_OUT.append("Image Name = " + croppedImgNames[i])
         PRINT_LOG_OUT.append("X = " + str(averagedClusters[i][1]))
         PRINT_LOG_OUT.append("Y = " + str(averagedClusters[i][0]))
+        cropSize = clusterSizes[i][1]/2 if clusterSizes[i][1]/2 > clusterSizes[i][0]/2 else clusterSizes[i][0]/2
+        padding = _MYPARAMS['CROP_PADDING']
+        PRINT_LOG_OUT.append("Size = " + str(2*(cropSize + padding)))
 
     # Output cluster locations
     #imgClusteredRegions = drawClusters(imgClusteredRegions, clusters, averagedClusters)
