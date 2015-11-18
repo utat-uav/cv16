@@ -15,7 +15,7 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "IMG_0520.jpg",
+    'IMAGE' : "IMG_0496.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -198,6 +198,10 @@ def main():
     print("Loading Image...")
     imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
 
+    height, width, channels = imgin.shape
+    PRINT_LOG_OUT.append("Width = " + str(width))
+    PRINT_LOG_OUT.append("Height = " + str(height))
+	
     # Check if image imported correctly
     #if (imgin == None):
     #    print "Image does not exist! Aborting...\n"
