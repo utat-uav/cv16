@@ -15,7 +15,7 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "IMG_0496.jpg",
+    'IMAGE' : "IMG_0520.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -267,6 +267,8 @@ def main():
     if _MYPARAMS['USE_TREE_FILTER']:
         averagedClusters, clusterSizes = filterTrees(imgin, averagedClusters, clusterSizes)
 
+	imageName = _MYPARAMS['IMAGE'].split('.')[0]
+		
     croppedImgNames = []
     print("Cropping...")
     for i, mypoint in enumerate(averagedClusters):
@@ -275,7 +277,7 @@ def main():
         row_crop = (clamp(mypoint[0]-cropSize - padding, 0, _IMBND[0]), clamp(mypoint[0]+cropSize + padding, 0, _IMBND[0]))
         col_crop = (clamp(mypoint[1]-cropSize - padding, 0, _IMBND[1]), clamp(mypoint[1]+cropSize + padding, 0, _IMBND[1]))
         new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
-        croppedImgNames.append('chan' + str(_MYPARAMS['ACTIVE_CHANNEL']) + '_roi' + str(i) + '.jpg')
+        croppedImgNames.append(imageName + ' roi' + str(i) + '.jpg')
         cv2.imwrite(os.path.join("Output", croppedImgNames[i]), new_crop)
 
     # Log clustering info
@@ -298,7 +300,7 @@ def main():
     cv2.imwrite(os.path.join("Output", 'croppedRegions.jpg'), imgClusteredRegions)
 
     # print result info to log file
-    with open(os.path.join("Output", 'results.ini'), 'a') as f:
+    with open(os.path.join("Output", imageName + ' Results.ini'), 'a') as f:
         for line in PRINT_LOG_OUT:
             f.write(line + '\n')
 
