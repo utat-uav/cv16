@@ -249,9 +249,9 @@ def main():
             cv2.polylines(vis, hulls, 1, (0, 255, 0))
             cv2.imwrite(os.path.join("Output", 'region visualization' + str(i) + '.jpg'), vis)
 
-            for i, point in enumerate(hullLocations):
+            for j, point in enumerate(hullLocations):
                 kpts.append(point)
-                kptsSize.append(hullSizes[i])
+                kptsSize.append(hullSizes[j])
 
         if (local_kpt):
             # don't know how the third param works yet  -->
