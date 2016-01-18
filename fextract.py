@@ -15,7 +15,7 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "IMG_0496.jpg",
+    'IMAGE' : "im0211.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -281,7 +281,7 @@ def main():
         row_crop = (clamp(mypoint[0]-cropSize - padding, 0, _IMBND[0]), clamp(mypoint[0]+cropSize + padding, 0, _IMBND[0]))
         col_crop = (clamp(mypoint[1]-cropSize - padding, 0, _IMBND[1]), clamp(mypoint[1]+cropSize + padding, 0, _IMBND[1]))
         new_crop = imgin[row_crop[0]:row_crop[1], col_crop[0]:col_crop[1]]
-        croppedImgNames.append(imageName + ' roi' + str(i) + '.jpg')
+        croppedImgNames.append(imageName + 'roi' + str(i) + '.jpg')
         cv2.imwrite(os.path.join("Output", croppedImgNames[i]), new_crop)
 
     # Log clustering info
