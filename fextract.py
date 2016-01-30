@@ -15,19 +15,19 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "im0211.jpg",
+    'IMAGE' : "im0217.jpg",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
     'MIN_POINTS_IN_CLUSTER' : 5,
     'USE_TREE_FILTER' : 1, # Filters out crops that are "tree colored"
 	# USC SETTINGS
-    'MAX_AREA' : 38000,
-    'MIN_AREA' : 3500,
+    #'MAX_AREA' : 38000,
+    #'MIN_AREA' : 3500,
 	# TARGET SETTINGS
-    #'MAX_AREA' : 30000,
-    #'MIN_AREA' : 2650,
-	'CROP_PADDING' : 6
+    'MAX_AREA' : 30000,
+    'MIN_AREA' : 2650,
+	'CROP_PADDING' : 8
 }
 
 
@@ -198,6 +198,8 @@ def main():
     print("Loading Image...")
     imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
 
+    cv2.imwrite(os.path.join("Output", _MYPARAMS['IMAGE']), imgin)
+
     height, width, channels = imgin.shape
     PRINT_LOG_OUT.append("Width = " + str(width))
     PRINT_LOG_OUT.append("Height = " + str(height))
@@ -247,7 +249,7 @@ def main():
             hulls = [cv2.convexHull(s.reshape(-1, 1, 2)) for s in regions]
             hullLocations, hullSizes = hulls2Points(hulls)
             cv2.polylines(vis, hulls, 1, (0, 255, 0))
-            cv2.imwrite(os.path.join("Output", 'region visualization' + str(i) + '.jpg'), vis)
+            #cv2.imwrite(os.path.join("Output", 'region visualization' + str(i) + '.jpg'), vis)
 
             for j, point in enumerate(hullLocations):
                 kpts.append(point)
@@ -257,7 +259,7 @@ def main():
             # don't know how the third param works yet  -->
             local_dpksout = cv2.drawKeypoints(im, local_kpt, im) 
             dkpsout.append([local_dpksout]) # append to master list
-            cv2.imwrite(os.path.join("Output", 'dkpsout' + str(i) + '.jpg'), local_dpksout)
+            #cv2.imwrite(os.path.join("Output", 'dkpsout' + str(i) + '.jpg'), local_dpksout)
 
             # print out num of keypoints and other info 
             PRINT_LOG_OUT.append('Channel ' + str(i) + ' = ' + str(len(local_kpt)))
