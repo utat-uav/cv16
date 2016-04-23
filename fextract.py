@@ -15,7 +15,7 @@ from time import strftime
 
 _MYPARAMS = {
     'ACTIVE_CHANNEL' : [1,2],
-    'IMAGE' : "im0217.jpg",
+    'IMAGE' : "",
     'HAS_BLUR' : 1,
     'BKS' : 6, # Blur Kernal size
     'SIZE_OF_ROI' : 300, # Cluster size
@@ -177,7 +177,11 @@ def stdClusters(clusters):
 
     return clusterStds
 
-def main():
+def fextract(imgin):
+    """ 
+        Args:
+            imgin - image in
+    """
 
     # Initialize dbscan
     myDbscan = dbscan(_MYPARAMS['SIZE_OF_ROI']/2);
@@ -189,15 +193,6 @@ def main():
     # print parameters
     PRINT_LOG_OUT += [str(k) + " = "  + str(_MYPARAMS[k]) for k in _MYPARAMS.keys()]
     
-    # output folder
-    fileList = os.listdir("Output")
-    for fileName in fileList:
-        os.remove("Output/"+fileName)
-    
-    # import image from file
-    print("Loading Image...")
-    imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
-
     cv2.imwrite(os.path.join("Output", _MYPARAMS['IMAGE']), imgin)
 
     height, width, channels = imgin.shape
@@ -225,8 +220,19 @@ def main():
     PRINT_LOG_OUT.append("FD Type = " + FD_TYPE)
     print("Running MSER...")
     # delta, maxArea, minArea, maxVariation, minDiversity, maxEvolution, areaThreshold, minMargin, edgeBlurSize
+    # Default is 5, 60, 14400, 0.25, 0.2, 200, 1.01, 0.003, 5
     # Decreasing maxVariation increases how sharp edges need to be
-    my_fd = cv2.MSER_create(5, _MYPARAMS['MIN_AREA'] / 2738 * _IMBND[0], _MYPARAMS['MAX_AREA'] / 2738 * _IMBND[0], 0.099, 0.65, 200, 1.01, 0.003, 5) # Default is 5, 60, 14400, 0.25, 0.2, 200, 1.01, 0.003, 5
+    my_fd = cv2.MSER_create(
+            5,                                             # _delta (int)
+            int(_MYPARAMS['MIN_AREA'] / 2738 * _IMBND[0]), # _min_area (int)
+            int(_MYPARAMS['MAX_AREA'] / 2738 * _IMBND[0]), # _max_area (int)
+            0.099,                                         # _max_variation (float)
+            0.65,                                          # _min_diversity (float)
+            200,                                           # _max_evolution (int)
+            1.01,                                          # _area_threshold (double)
+            0.003,                                         # _min_margin (double)
+            5                                              # _edge_blur_size (int)
+    )                                                      
 
     # FD_TYPE = "SimpleBlob"
     # PRINT_LOG_OUT.append("FD Type: " + FD_TYPE)
@@ -273,7 +279,7 @@ def main():
     if _MYPARAMS['USE_TREE_FILTER']:
         averagedClusters, clusterSizes = filterTrees(imgin, averagedClusters, clusterSizes)
 
-	imageName = _MYPARAMS['IMAGE'].split('.')[0]
+    imageName = _MYPARAMS['IMAGE'].split('.')[0]
 		
     croppedImgNames = []
     print("Cropping...")
@@ -306,9 +312,26 @@ def main():
     cv2.imwrite(os.path.join("Output", 'croppedRegions.jpg'), imgClusteredRegions)
 
     # print result info to log file
-    with open(os.path.join("Output", imageName + ' Results.ini'), 'a') as f:
+    with open(os.path.join("Output", imageName + ' .ini'), 'a') as f:
         for line in PRINT_LOG_OUT:
             f.write(line + '\n')
 
 if __name__ == "__main__":
-    main()
+    # Initialize output folder
+    if not os.path.exists("./Output"):
+        os.makedirs("./Output") 
+#   fileList = os.listdir("Output")
+#   for fileName in fileList:
+#       os.remove("Output/"+fileName)
+
+    # Import image from file
+    if not _MYPARAMS["IMAGE"]:
+        flist = [f for f in os.listdir("./") if f.endswith(".jpg")]
+        for f in flist:
+            print("Loading Image ", f)
+            _MYPARAMS['IMAGE'] = f
+            imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
+            fextract(imgin)
+    else:
+        imgin = cv2.imread(_MYPARAMS['IMAGE'], cv2.IMREAD_COLOR)
+        fextract(imgin)
